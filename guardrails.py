@@ -1,7 +1,7 @@
 import re
 from typing import Optional
 
-from tools import FLIGHTS_DB, HOTELS_DB, calculate_budget
+from tools import FLIGHTS_DB, HOTELS_DB, calculate_budget_impl, search_flights, search_hotels
 
 
 CITY_NAMES = sorted(
@@ -17,6 +17,8 @@ def normalize_text(s: str) -> str:
 
 def fmt_money(v: int) -> str:
     return "{:,.0f}đ".format(v).replace(",", ".")
+
+
 
 
 def looks_like_travel_request(text: str) -> bool:
@@ -42,17 +44,21 @@ def looks_like_travel_request(text: str) -> bool:
 
 
 def extract_cities(text: str) -> list[str]:
-    found: list[str] = []
     nt = normalize_text(text)
+    matches: list[tuple[int, str]] = []
     for city in CITY_NAMES:
-        if city.lower() in nt:
-            found.append(city)
+        idx = nt.find(city.lower())
+        if idx != -1:
+            matches.append((idx, city))
+
+    matches.sort(key=lambda item: item[0])
+
     seen = set()
     uniq: list[str] = []
-    for c in found:
-        if c not in seen:
-            uniq.append(c)
-            seen.add(c)
+    for _, city in matches:
+        if city not in seen:
+            uniq.append(city)
+            seen.add(city)
     return uniq
 
 
@@ -171,6 +177,7 @@ def build_trip_plan_response(user_text: str) -> Optional[str]:
     if total_budget is None or nights is None or hotel_budget_per_night is None:
         return None
 
+    flight_search_text = search_flights(origin, destination)
     flights = FLIGHTS_DB.get((origin, destination)) or FLIGHTS_DB.get((destination, origin)) or []
     if not flights:
         flight_line = f"Không tìm thấy chuyến bay phù hợp cho tuyến {origin} ↔ {destination}."
@@ -183,10 +190,11 @@ def build_trip_plan_response(user_text: str) -> Optional[str]:
             f"{best_flight['departure']} → {best_flight['arrival']} | Giá {fmt_money(flight_cost)}"
         )
 
+    hotel_search_text = search_hotels(destination, hotel_budget_per_night)
     hotels = HOTELS_DB.get(destination) or []
     hotels_ok = [h for h in hotels if int(h["price_per_night"]) <= hotel_budget_per_night]
     if not hotels_ok:
-        hotel_line = f"Không có khách sạn ở {destination} dưới {fmt_money(hotel_budget_per_night)}/đêm."
+        hotel_line = hotel_search_text
         hotel_cost = 0
     else:
         best_hotel = sorted(hotels_ok, key=lambda h: (h["rating"], h["stars"]), reverse=True)[0]
@@ -198,7 +206,7 @@ def build_trip_plan_response(user_text: str) -> Optional[str]:
         )
 
     expenses_str = f"vé_máy_bay:{flight_cost},khách_sạn:{hotel_cost}"
-    budget_table = calculate_budget(total_budget=total_budget, expenses=expenses_str)
+    budget_table = calculate_budget_impl(total_budget=total_budget, expenses=expenses_str)
 
     total_est = flight_cost + hotel_cost
     total_line = f"{fmt_money(total_est)} (chi tiết:\n{budget_table})"

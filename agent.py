@@ -10,9 +10,9 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, AIMessage
 from tools import (
-    search_flights,
-    search_hotels,
-    calculate_budget,
+    search_flights_tool,
+    search_hotels_tool,
+    calculate_budget_tool,
 )
 from dotenv import load_dotenv
 import os
@@ -39,7 +39,7 @@ class AgentState(TypedDict):
     messages: Annotated[list, add_messages]
 
 # 3. Khởi tạo LLM và Tools
-tools_list = [search_flights, search_hotels, calculate_budget]
+tools_list = [search_flights_tool, search_hotels_tool, calculate_budget_tool]
 llm = ChatOpenAI(model="gpt-4o-mini")
 llm_with_tools = llm.bind_tools(tools_list)
 
@@ -66,23 +66,21 @@ def agent_node(state: AgentState):
         logger.info("Trả lời trực tiếp")
         return {"messages": [response]}
 
-    # Nếu đủ thông tin, tự làm multi-step tool chaining để chắc Test 3
-    chained = build_trip_plan_response(last_user_text or "")
-    if chained:
-        response = AIMessage(content=chained)
-        logger.info("Trả lời trực tiếp")
-        return {"messages": [response]}
-
     # Ép format đầu ra theo yêu cầu đề bài (giảm rủi ro trả lời sai cấu trúc)
     format_enforcer = SystemMessage(
         content=(
-            "Khi tư vấn chuyến đi, bạn PHẢI trình bày đúng cấu trúc 4 dòng/4 mục sau:\n"
-            "Chuyến bay: ...\n"
-            "Khách sạn: ...\n"
-            "Tổng chi phí ước tính: ...\n"
-            "Gợi ý thêm: ...\n"
-            "Nếu người dùng chỉ hỏi 1 phần (ví dụ chỉ hỏi khách sạn), vẫn trả lời theo cấu trúc trên, "
-            "nhưng các mục không liên quan thì ghi ngắn gọn 'Chưa đủ thông tin' hoặc 'Không yêu cầu'."
+            "NHẮC NHẮN: Khi tư vấn chuyến đi du lịch, bạn PHẢI sử dụng đầy đủ 3 tools:\n"
+            "1. search_flights(origin, destination) – tìm vé máy bay\n"
+            "2. search_hotels(city, max_price_per_night) – tìm khách sạn\n"
+            "3. calculate_budget(total_budget, expenses) – tính toán ngân sách\n"
+            "\n"
+            "Sau khi gọi các tools, format câu trả lời đúng cấu trúc 4 phần:\n"
+            "Chuyến bay: [Chi tiết chuyến bay]\n"
+            "Khách sạn: [Chi tiết khách sạn]\n"
+            "Tổng chi phí ước tính: [Bảng chi phí từ calculate_budget]\n"
+            "Gợi ý thêm: [Lời khuyên]\n"
+            "\n"
+            "Không được dừng lại sau khi gọi 1 hay 2 tools. Phải gọi cả 3 để hoàn thành tư vấn!"
         )
     )
     messages = messages + [format_enforcer]

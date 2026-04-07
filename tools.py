@@ -62,7 +62,6 @@ HOTELS_DB = {
     ],
 }
 
-@tool
 def search_flights(origin: str, destination: str) -> str:
     """
     Tìm kiếm các chuyến bay giữa hai thành phố.
@@ -104,7 +103,9 @@ def search_flights(origin: str, destination: str) -> str:
     
     return result
 
-@tool
+search_flights_tool = tool(search_flights)
+
+
 def search_hotels(city: str, max_price_per_night: int = 99999999) -> str:
     """
     Tìm kiếm khách sạn tại một thành phố, có thể lọc theo giá tối đa mỗi đêm.
@@ -142,30 +143,12 @@ def search_hotels(city: str, max_price_per_night: int = 99999999) -> str:
     
     return result
 
-@tool
-def calculate_budget(total_budget: int, expenses: str) -> str:
+search_hotels_tool = tool(search_hotels)
+
+def calculate_budget_impl(total_budget: int, expenses: str) -> str:
     """
-    Tính toán ngân sách còn lại sau khi trừ các khoản chi phí.
-    Tham số:
-    - total_budget: tổng ngân sách ban đầu (VNĐ)
-    - expenses: chuỗi mô tả các khoản chi, mỗi khoản cách nhau bởi dấu phẩy, định dạng 'tên_khoản:số_tiền' (VD: 'vé_máy_bay:890000,khách_sạn:650000')
-    Trả về bảng chi tiết các khoản chi và số tiền còn lại.
-    Nếu vượt ngân sách, cảnh báo rõ ràng số tiền thiếu.
+    Nội bộ: tính toán ngân sách còn lại sau khi trừ các khoản chi phí.
     """
-    # TODO: Sinh viên tự triển khai
-    # - Parse chuỗi expenses thành dict {tên: số_tiền}
-    # - Tính tổng chi phí
-    # - Tính số tiền còn lại = total_budget - tổng chi phí
-    # - Format bảng chi tiết:
-    #   Bảng chi phí:
-    #   - Vé máy bay: 890.000đ
-    #   - Khách sạn: 650.000đ
-    #   ---
-    #   Tổng chi: 1.540.000đ
-    #   Ngân sách: 5.000.000đ
-    #   Còn lại: 3.460.000đ
-    # - Nếu âm -> "Vượt ngân sách X đồng! Cần điều chỉnh."
-    # - Xử lý lỗi: nếu expenses format sai -> trả về thông báo lỗi rõ ràng
     def _fmt_money(v: int) -> str:
         return "{:,.0f}đ".format(v).replace(",", ".")
 
@@ -219,7 +202,6 @@ def calculate_budget(total_budget: int, expenses: str) -> str:
 
         remaining = total_budget - total_expense
 
-        # Output đúng format đề bài
         result = "Bảng chi phí:\n"
         result += "\n".join(detail_lines)
         result += "\n---\n"
@@ -238,3 +220,17 @@ def calculate_budget(total_budget: int, expenses: str) -> str:
             f"Lỗi định dạng chi phí: '{expenses}'. "
             "Vui lòng nhập theo định dạng 'tên_khoản:số_tiền,tên_khoản:số_tiền'."
         )
+
+
+def calculate_budget(total_budget: int, expenses: str) -> str:
+    """
+    Tính toán ngân sách còn lại sau khi trừ các khoản chi phí.
+    Tham số:
+    - total_budget: tổng ngân sách ban đầu (VNĐ)
+    - expenses: chuỗi mô tả các khoản chi, mỗi khoản cách nhau bởi dấu phẩy, định dạng 'tên_khoản:số_tiền' (VD: 'vé_máy_bay:890000,khách_sạn:650000')
+    Trả về bảng chi tiết các khoản chi và số tiền còn lại.
+    Nếu vượt ngân sách, cảnh báo rõ ràng số tiền thiếu.
+    """
+    return calculate_budget_impl(total_budget, expenses)
+
+calculate_budget_tool = tool(calculate_budget)
